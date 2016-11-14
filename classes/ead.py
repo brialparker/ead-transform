@@ -111,7 +111,7 @@ class Ead(object):
                     '{0} : Added missing extent element to {1}'.format(
                         self.name, physdesc
                         ))
-        for physdesc in self.tree.findall('./archdesc/dsc/c01/physdesc'):
+        for physdesc in self.tree.findall('./archdesc/dsc/c01/did/physdesc'):
             children = physdesc.getchildren()
             if not children:
                 ext = ET.SubElement(physdesc, "extent")
