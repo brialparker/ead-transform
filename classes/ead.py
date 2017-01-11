@@ -136,7 +136,6 @@ class Ead(object):
                             ))
 
 
-
     #======================================
     # Clean up and standardize extent text
     #======================================
