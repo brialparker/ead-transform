@@ -22,6 +22,10 @@ class Ead(object):
     #=============================
     # Add title attribute to dao
     #=============================
+    
+    #I can now handle this in XSLT (and include instances where title attributes weren't being generated because a title
+    #element existed under the unittitle). I wasn't sure how to add logic here to look at title elements within a unittitle
+    #and insert them into the unittitle appropriately
     def add_title_to_dao(self):
         for dao in self.tree.findall('.//dao'):
             parent = dao.getparent()
@@ -89,7 +93,8 @@ class Ead(object):
                         
                         # create attributes corresponding to the parent box
                         if match:
-                            box_number = match.group(2)
+                        #this should replace the box number with the number after the decimal point, which is what we need
+                            box_number = match.group(3)
                             box_id = "{0}.{1}".format(match.group(2),
                                                       match.group(3)
                                                       )
@@ -189,7 +194,8 @@ class Ead(object):
             # make the text of element match the id attribute        
             match = re.search(r'^(box)?(\d+).\d+$', box.get('id'))
             current_text = box.text
-            new_text = match.group(2)
+            #this should replace the box number with the number after the decimal point, which is what we need
+            new_text = match.group(3)
             if current_text != new_text:
                 box.text = new_text
                 self.logger.info(
