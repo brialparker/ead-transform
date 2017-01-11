@@ -214,10 +214,9 @@ def main():
             ead = Ead(basename, handle, BytesIO(ead_bytes))
             
             # add missing elements
-            ead.add_missing_box_containers()
-            ead.sort_containers()
             ead.add_missing_extents()
             ead.correct_text_in_extents()
+            ead.add_missing_box_containers()
             ead.insert_handle()
             ead.add_title_to_dao()
             
@@ -229,6 +228,7 @@ def main():
             # fix errors and rearrange
             ead.fix_box_number_discrepancies()
             ead.move_scopecontent()
+            ead.sort_containers()
 
             # write out result
             ead.tree.write(output_path, 

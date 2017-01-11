@@ -1,6 +1,7 @@
 import logging
 import lxml.etree as ET
 import re
+import string
 
 class Ead(object):
 
@@ -56,10 +57,31 @@ class Ead(object):
             parent_level = parent.get('level')
 
             if parent_level in ['file', 'item']:
-                # check whether a box container exists already; if so, break out
+                # iterate over all the container nodes
                 for c in did.iterchildren(tag='container'):
+                
+                    # remove "box" from the id attribute
+                    if c.get('id'):
+                        old_id = c.get('id')
+                        c.set('id', old_id.lstrip('box'))
+                        self.logger.info(
+                            '{0} : Removed "box" prefix from id {1}'.format(
+                                self.name, old_id 
+                                ))
+                    
+                    # remove "box" from the parent attribute
+                    if c.get('parent'):
+                        old_parent = c.get('parent')
+                        c.set('parent', old_parent.lstrip('box'))
+                        self.logger.info(
+                            '{0} : Removed "box" prefix from parent {1}'.format(
+                                self.name, old_parent
+                                ))
+                    
+                    # check whether box container exists; & if so, break out            
                     if c.get('type') == 'box':
                         break
+                    
                     # if not, create a box container
                     else:
                         box_attribute = c.get('parent') or ''
@@ -87,13 +109,12 @@ class Ead(object):
     def sort_containers(self):
         # iterate over item- and file-level containers
         for n, did in enumerate(self.tree.iter('did')):
-            last_position = len(list(did))
             for elem in list(did):
                 if 'parent' in elem.keys():
-                    did.insert(last_position, elem)
+                    did.append(elem)
                     self.logger.info(
-                    '{0} : Moving child container to position {1} '.format(
-                        self.name, last_position
+                    '{0} : Moving child container to last position'.format(
+                        self.name
                         ))
 
 
@@ -101,26 +122,19 @@ class Ead(object):
     # Missing extents in physdesc elements
     #======================================
     def add_missing_extents(self):
-        for physdesc in self.tree.findall('./archdesc/did/physdesc'):
-            children = physdesc.getchildren()
-            if not children:
-                ext = ET.SubElement(physdesc, "extent")
-                ext.text = physdesc.text
-                physdesc.text = ''
-                self.logger.info(
-                    '{0} : Added missing extent element to {1}'.format(
-                        self.name, physdesc
-                        ))
-        for physdesc in self.tree.findall('./archdesc/dsc/c01/did/physdesc'):
-            children = physdesc.getchildren()
-            if not children:
-                ext = ET.SubElement(physdesc, "extent")
-                ext.text = physdesc.text
-                physdesc.text = ''
-                self.logger.info(
-                    '{0} : Added missing extent element to {1}'.format(
-                        self.name, physdesc
-                        ))
+        paths = ['./archdesc/did/physdesc', './archdesc/dsc/c01/did/physdesc']
+        for path in paths:
+            for physdesc in self.tree.findall(path):
+                children = physdesc.getchildren()
+                if not children:
+                    ext = ET.SubElement(physdesc, "extent")
+                    ext.text = physdesc.text
+                    physdesc.text = ''
+                    self.logger.info(
+                        '{0} : Added missing extent element to {1}'.format(
+                            self.name, physdesc
+                            ))
+
 
 
     #======================================
@@ -128,13 +142,22 @@ class Ead(object):
     #======================================
     def correct_text_in_extents(self):
         for extent in self.tree.findall('.//extent'):
+            # split text into words and filter word approximately
             words = [w for w in extent.text.split() if w != 'approximately']
+            numeric_chars = set('0123456789,')
             for word in words:
+                # remove line breaks and trailing spaces
+                word = word.replace("\n", "")
                 word = word.rstrip()
+                # check word is digits/commas only and remove comma unless last
+                if all([(c in numeric_chars) for c in word]):
+                    word = word[:-1].replace(",", "") + word[-1:]
+                # change linear and feet into standard forms
                 if word == 'Linear' or word == 'lin':
                     word = 'linear'
                 elif word == 'ft':
                     word = 'feet'
+            # re-join the words
             result = ' '.join(words)
             if result != extent.text:
                 print('Changed {0} to {1}'.format(extent.text, result))
@@ -149,17 +172,30 @@ class Ead(object):
     # fix incorrect box numbers
     #===========================
     def fix_box_number_discrepancies(self):
+        # find all the box-level containers
         boxes = [c for c in self.tree.iter(
                     'container') if c.get('type') == 'box'
                     ]
-                    
+        # iterate over these containers
         for box in boxes:
+            # remove the "box" prefix from the ID
+            current_id = box.get('id')
+            new_id = current_id.lstrip('box')
+            if current_id != new_id:
+                box.set('id', new_id)
+                self.logger.info(
+                    '{0} : Changed box "{1}" to "{2}"'.format(
+                        self.name, current_id, new_id
+                        ))
+            # make the text of element match the id attribute        
             match = re.search(r'^(box)?(\d+).\d+$', box.get('id'))
-            if box.text != match.group(2):
-                box.text = match.group(2)
+            current_text = box.text
+            new_text = match.group(2)
+            if current_text != new_text:
+                box.text = new_text
                 self.logger.info(
                     '{0} : Corrected box {1} to {2}'.format(
-                        self.name, ET.tostring(box), match.group(2)
+                        self.name, current_text, box.text
                         ))
 
 
